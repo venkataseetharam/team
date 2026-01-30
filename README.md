@@ -2,7 +2,7 @@
 
 Welcome to the ML Engineering coding interview! This exercise tests your ability to debug, optimize, and extend a real-world product search reranking service.
 
-**Time:** 60-90 minutes  
+**Time:** 60 minutes  
 **Tools:** You may use any LLM tools (Copilot, Claude, ChatGPT, etc.) to help you
 
 ---
@@ -61,40 +61,49 @@ Once running, visit `http://localhost:8000/docs` for interactive API docs.
 The test suite (`test_reranker.py`) will fail several tests. Your task is to:
 
 1. **Find Bug #1:** The RRF calculation is dropping products unexpectedly
-2. **Find Bug #2:** Concurrent requests sometimes produce inconsistent results  
-3. **Find Bug #3:** The RRF crashes or returns wrong results with certain inputs
+   - Some products that should appear in results are missing entirely
+
+2. **Find Bug #2:** The RRF returns unfair scores for certain products
+   - Products appearing in only one retrieval system are being penalized too harshly
 
 For each bug:
 - Identify the root cause
 - Implement a fix
 - Explain why the bug occurred
 
-### Part 2: Architecture 
+### Part 2: Code Review
+
+Review the `rerank_products()` method, specifically the ThreadPoolExecutor usage:
+- Is the code thread-safe?
+- What could go wrong in other Python implementations?
+- Would you approve this in a code review? Why or why not?
+- If you see issues, propose a fix
+
+### Part 3: Architecture
 
 1. **Implement Embedding Cache**
    - Complete the `EmbeddingCache` class in `reranker_service.py`
+   - Requirements: TTL support, thread-safe, LRU eviction
    - Integrate it into the reranking flow
 
 2. **Design Fallback Strategy**
    - What should happen when `simulate_reranker_api()` fails?
-   - Implement graceful degradation
+   - Implement graceful degradation with retry logic
 
-### Part 3: Efficiency 
+### Part 4: Efficiency
 
 1. **Optimize Batch Processing**
    - The current batch size is fixed at 10
    - Analyze and implement a better batching strategy
-   - Consider: API limits, memory, parallelism
 
 2. **Reduce Memory Overhead**
    - Find and fix unnecessary DataFrame copies
    - Optimize the DataFrame operations
 
-### Part 4: Code Quality 
+### Part 5: Code Quality 
 
 - Clean, readable code
 - Appropriate comments
-- Consistent style
 - Proper error handling
 
 ---
