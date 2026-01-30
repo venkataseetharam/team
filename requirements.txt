@@ -1,0 +1,15 @@
+# Product Reranker Service Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# Data processing
+polars>=0.19.0
+
+# HTTP client for tests
+requests>=2.31.0
+
+# Optional: Better testing
+pytest>=7.4.0
