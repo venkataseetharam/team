@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NISAR Subsidence Map</title>
+  <link rel="icon" type="image/x-icon" href="../../../img/logo/neighborhood/favicon.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    :root {
+      --bg: #f3f6f3;
+      --panel: #ffffff;
+      --text: #1f2a1f;
+      --muted: #5d6e5d;
+      --border: #d8e2d8;
+      --accent: #2f7d32;
+      --low: #2b8cbe;
+      --moderate: #f39c12;
+      --high: #e74c3c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top left, #e7f2ea 0%, #f6f9f7 55%, #ffffff 100%);
+      min-height: 100vh;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      min-height: 100vh;
+    }
+
+    .panel {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 18px;
+      overflow-y: auto;
+    }
+
+    h1 { font-size: 1.3rem; margin-bottom: 10px; }
+
+    .subtext {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.35;
+      margin-bottom: 14px;
+    }
+
+    .data-status {
+      font-size: 0.78rem;
+      padding: 5px 8px;
+      border-radius: 6px;
+      margin-bottom: 12px;
+      background: #e8f5e9;
+      color: #2f7d32;
+      border: 1px solid #c8e6c9;
+    }
+    .data-status.error { background: #fff3e0; color: #e65100; border-color: #ffe0b2; }
+
+    .controls { display: grid; gap: 10px; margin-bottom: 14px; }
+
+    label {
+      font-size: 0.82rem;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    select, button {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.92rem;
+      padding: 8px 10px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    button {
+      cursor: pointer;
+      border-color: var(--accent);
+      color: #fff;
+      background: var(--accent);
+      font-weight: 600;
+    }
+    button:hover { filter: brightness(0.95); }
+
+    .legend {
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 0;
+      margin-bottom: 14px;
+    }
+    .legend h2 { font-size: 0.92rem; margin-bottom: 6px; }
+    .legend-row {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.82rem; color: var(--muted); margin: 3px 0;
+    }
+    .swatch {
+      width: 12px; height: 12px; border-radius: 50%;
+      border: 1px solid rgba(0,0,0,0.2); flex-shrink: 0;
+    }
+
+    /* Seasonal summary */
+    .season-summary {
+      background: #f8fdf8;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+    .season-summary h2 { font-size: 0.92rem; margin-bottom: 8px; }
+    .season-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .season-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 9px;
+      font-size: 0.8rem;
+    }
+    .season-card .s-name { font-weight: 600; color: var(--text); }
+    .season-card .s-val  { color: var(--muted); margin-top: 2px; }
+
+    .records { display: grid; gap: 8px; }
+
+    .record {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--low);
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .record h3 { font-size: 0.92rem; margin-bottom: 4px; }
+    .record .meta { color: var(--muted); font-size: 0.8rem; line-height: 1.3; }
+    .record .rate { margin-top: 6px; font-weight: 700; font-size: 0.9rem; }
+
+    #map { height: 100vh; width: 100%; }
+
+    .leaflet-popup-content { line-height: 1.35; margin: 10px 12px; }
+
+    .map-note {
+      position: absolute;
+      z-index: 900;
+      right: 12px; top: 12px;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      max-width: 260px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { border-right: none; border-bottom: 1px solid var(--border); }
+      #map { height: 65vh; }
+    }
+  </style>
+</head>
+<body>
+<div class="layout">
+  <aside class="panel">
+    <h1>NISAR Ground Subsidence</h1>
+    <p class="subtext">
+      Land sinking due to groundwater over-pumping, visualised from
+      NASA NISAR satellite data. Data refreshes weekly via automated pipeline.
+    </p>
+
+    <div class="data-status" id="dataStatus">Loading data…</div>
+
+    <div class="controls">
+      <div>
+        <label for="stateFilter">Filter by US State</label>
+        <select id="stateFilter">
+          <option value="all">All states / global</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="countyFilter">Filter by County</label>
+        <select id="countyFilter">
+          <option value="all">All counties</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="seasonFilter">Season</label>
+        <select id="seasonFilter">
+          <option value="all">All seasons</option>
+          <option value="Spring">Spring</option>
+          <option value="Summer">Summer</option>
+          <option value="Fall">Fall</option>
+          <option value="Winter">Winter</option>
+          <option value="annual">Annual average</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="unitSelect">Display unit</label>
+        <select id="unitSelect">
+          <option value="cm">Centimeters per year</option>
+          <option value="in">Inches per year</option>
+        </select>
+      </div>
+
+      <button id="fitBtn" type="button">Fit To Visible Points</button>
+    </div>
+
+    <section class="legend">
+      <h2>Annual Drop Rate</h2>
+      <div class="legend-row"><span class="swatch" style="background:var(--low);"></span> Low (up to 2 cm/yr)</div>
+      <div class="legend-row"><span class="swatch" style="background:var(--moderate);"></span> Moderate (2–10 cm/yr)</div>
+      <div class="legend-row"><span class="swatch" style="background:var(--high);"></span> High (above 10 cm/yr)</div>
+    </section>
+
+    <section class="season-summary" id="seasonSummary" style="display:none;">
+      <h2>Seasonal Summary (visible area)</h2>
+      <div class="season-grid" id="seasonGrid"></div>
+    </section>
+
+    <section class="records" id="records"></section>
+
+    <p class="subtext" style="margin-top:14px;font-size:0.8rem;">
+      Data source: <a href="https://science.nasa.gov/mission/nisar/data" target="_blank">NASA NISAR</a>.
+      Pipeline runs weekly via GitHub Actions. Reference cities included when NISAR coverage is sparse.
+    </p>
+  </aside>
+
+  <main style="position:relative;">
+    <div id="map"></div>
+    <div class="map-note">Click map once to toggle scroll-wheel zoom on/off.</div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---------------------------------------------------------------------------
+// Configuration
+// ---------------------------------------------------------------------------
+// Fetch from the raw GitHub CSV that the weekly pipeline keeps fresh.
+// Falls back to embedded data if the fetch fails (e.g. offline / CORS).
+const DATA_URL =
+  "https://raw.githubusercontent.com/ModelEarth/team/main/data/nisar_subsidence.csv";
+
+const FALLBACK_ROWS = [
+  { lat:"29.76", lon:"-95.37", subsidence_value:"1",    subsidence_unit:"cm/year", location_name:"Houston, TX",          state:"Texas",     county:"Harris County",     zip:"77002", season:"annual", source_date:"2025-Q4", source:"reference" },
+  { lat:"35.69", lon:"51.39",  subsidence_value:"33",   subsidence_unit:"cm/year", location_name:"Tehran, Iran",          state:"",          county:"",                  zip:"",      season:"annual", source_date:"2025-Q4", source:"reference" },
+  { lat:"-6.13", lon:"106.84", subsidence_value:"27.9", subsidence_unit:"cm/year", location_name:"North Jakarta, Indonesia", state:"",       county:"",                  zip:"",      season:"annual", source_date:"2025-Q4", source:"reference" },
+];
+
+// ---------------------------------------------------------------------------
+// Map setup
+// ---------------------------------------------------------------------------
+const map = L.map("map", { scrollWheelZoom: false, doubleClickZoom: false })
+              .setView([15, 25], 2);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+
+let zoomEnabled = false;
+map.on("click", () => {
+  zoomEnabled = !zoomEnabled;
+  zoomEnabled ? (map.scrollWheelZoom.enable(), map.doubleClickZoom.enable())
+              : (map.scrollWheelZoom.disable(), map.doubleClickZoom.disable());
+});
+
+// ---------------------------------------------------------------------------
+// DOM refs
+// ---------------------------------------------------------------------------
+const stateFilter   = document.getElementById("stateFilter");
+const countyFilter  = document.getElementById("countyFilter");
+const seasonFilter  = document.getElementById("seasonFilter");
+const unitSelect    = document.getElementById("unitSelect");
+const fitBtn        = document.getElementById("fitBtn");
+const recordsEl     = document.getElementById("records");
+const dataStatus    = document.getElementById("dataStatus");
+const seasonSummary = document.getElementById("seasonSummary");
+const seasonGrid    = document.getElementById("seasonGrid");
+
+const markersLayer = L.layerGroup().addTo(map);
+const markerById   = new Map();
+let allRecords = [];
+
+// ---------------------------------------------------------------------------
+// CSV parsing
+// ---------------------------------------------------------------------------
+function parseCsvLine(line) {
+  const vals = [];
+  let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (c === ',' && !inQ) {
+      vals.push(cur); cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  vals.push(cur);
+  return vals.map(v => v.trim());
+}
+
+function toCmPerYear(value, unit) {
+  const n = parseFloat(value);
+  if (!isFinite(n)) return null;
+  return String(unit).toLowerCase().includes("in") ? n * 2.54 : n;
+}
+
+function normalizeRow(row) {
+  // Supports both old column names (from nisar.html CSV schema) and
+  // new pipeline schema (lat/lon/subsidence_value/state/county/zip/season)
+  const lat = parseFloat(row.lat || row.latitude);
+  const lon = parseFloat(row.lon || row.longitude);
+  const cm  = toCmPerYear(
+    row.subsidence_value || row.value,
+    row.subsidence_unit  || row.unit || "cm/year"
+  );
+  if (!isFinite(lat) || !isFinite(lon) || !isFinite(cm)) return null;
+
+  return {
+    id:     row.record_id || `${lat},${lon}`,
+    place:  row.location_name || row.location || "Unknown",
+    state:  row.state || row.admin_level_1 || "",
+    county: row.county || row.area_name || "",
+    zip:    row.zip || row.postal_code || "",
+    season: row.season || "annual",
+    source: row.source || row.source_label || "NISAR",
+    sourceDate: row.source_date || "",
+    lat, lon, cm,
+  };
+}
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return [];
+  const headers = parseCsvLine(lines[0]);
+  return lines.slice(1)
+    .map(line => {
+      const row = {};
+      parseCsvLine(line).forEach((v, i) => { row[headers[i]] = v; });
+      return normalizeRow(row);
+    })
+    .filter(Boolean);
+}
+
+// ---------------------------------------------------------------------------
+// Data loading
+// ---------------------------------------------------------------------------
+async function loadRecords() {
+  try {
+    const res = await fetch(DATA_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const rows = parseCsv(text);
+    if (!rows.length) throw new Error("CSV has 0 valid rows");
+    setStatus(`Live data loaded — ${rows.length} locations`, false);
+    return rows;
+  } catch (err) {
+    console.warn("Live fetch failed, using fallback data.", err);
+    setStatus("Using embedded reference data (live fetch failed)", true);
+    return FALLBACK_ROWS.map(normalizeRow).filter(Boolean);
+  }
+}
+
+function setStatus(msg, isError) {
+  dataStatus.textContent = msg;
+  dataStatus.className = "data-status" + (isError ? " error" : "");
+}
+
+// ---------------------------------------------------------------------------
+// Filter population
+// ---------------------------------------------------------------------------
+function populateFilters(records) {
+  const states  = [...new Set(records.map(r => r.state).filter(Boolean))].sort();
+  stateFilter.innerHTML = '<option value="all">All states / global</option>';
+  states.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    stateFilter.appendChild(opt);
+  });
+}
+
+function updateCountyFilter(records) {
+  const sel = stateFilter.value;
+  const counties = [...new Set(
+    records.filter(r => sel === "all" || r.state === sel)
+           .map(r => r.county).filter(Boolean)
+  )].sort();
+  countyFilter.innerHTML = '<option value="all">All counties</option>';
+  counties.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c; opt.textContent = c;
+    countyFilter.appendChild(opt);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Seasonal summary
+// ---------------------------------------------------------------------------
+function renderSeasonSummary(visible) {
+  const bySeason = {};
+  visible.forEach(r => {
+    const s = r.season || "annual";
+    if (!bySeason[s]) bySeason[s] = [];
+    bySeason[s].push(r.cm);
+  });
+  const seasons = Object.keys(bySeason);
+  if (!seasons.length) { seasonSummary.style.display = "none"; return; }
+
+  seasonSummary.style.display = "";
+  const unit = unitSelect.value;
+  seasonGrid.innerHTML = seasons.map(s => {
+    const vals = bySeason[s];
+    const avg  = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const disp = unit === "in"
+      ? `${(avg / 2.54).toFixed(2)} in/yr`
+      : `${avg.toFixed(2)} cm/yr`;
+    return `<div class="season-card">
+      <div class="s-name">${s}</div>
+      <div class="s-val">avg ${disp}<br><small>${vals.length} location${vals.length > 1 ? "s" : ""}</small></div>
+    </div>`;
+  }).join("");
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function rateColor(cm) {
+  return cm <= 2 ? "#2b8cbe" : cm <= 10 ? "#f39c12" : "#e74c3c";
+}
+
+function rateText(cm, unit) {
+  return unit === "in"
+    ? `${(cm / 2.54).toFixed(2)} in/yr`
+    : `${cm.toFixed(2)} cm/yr`;
+}
+
+function visibleRecords() {
+  const state  = stateFilter.value;
+  const county = countyFilter.value;
+  const season = seasonFilter.value;
+  return allRecords.filter(r => {
+    if (state  !== "all" && r.state  !== state)  return false;
+    if (county !== "all" && r.county !== county) return false;
+    if (season !== "all" && r.season !== season) return false;
+    return true;
+  });
+}
+
+function renderMap() {
+  const unit = unitSelect.value;
+  const list = visibleRecords();
+  markersLayer.clearLayers();
+  markerById.clear();
+
+  list.forEach(r => {
+    const color  = rateColor(r.cm);
+    const radius = Math.max(6, Math.min(22, 6 + r.cm * 0.35));
+    const marker = L.circleMarker([r.lat, r.lon], {
+      radius, color, weight: 2, fillColor: color, fillOpacity: 0.35
+    }).bindPopup(`
+      <strong>${r.place}</strong><br>
+      ${[r.county, r.state].filter(Boolean).join(", ")}<br>
+      ${r.zip ? `ZIP ${r.zip}<br>` : ""}
+      <strong>Drop rate:</strong> ${rateText(r.cm, unit)}<br>
+      <strong>Season:</strong> ${r.season}<br>
+      <strong>Source:</strong> ${r.source}${r.sourceDate ? ` (${r.sourceDate})` : ""}
+    `);
+    marker.addTo(markersLayer);
+    markerById.set(r.id, marker);
+  });
+
+  fitToVisible(false);
+  renderSeasonSummary(list);
+}
+
+function renderList() {
+  const unit = unitSelect.value;
+  const list = visibleRecords();
+  if (!list.length) {
+    recordsEl.innerHTML = "<p class='subtext'>No records match this filter.</p>";
+    return;
+  }
+  recordsEl.innerHTML = list.map(r => {
+    const color = rateColor(r.cm);
+    const meta  = [r.county, r.state, r.zip ? `ZIP ${r.zip}` : ""].filter(Boolean).join(" · ");
+    return `<article class="record" data-id="${r.id}" style="border-left-color:${color};">
+      <h3>${r.place}</h3>
+      ${meta ? `<p class="meta">${meta}</p>` : ""}
+      <p class="meta">Season: ${r.season}</p>
+      <p class="rate" style="color:${color};">${rateText(r.cm, unit)}</p>
+    </article>`;
+  }).join("");
+
+  recordsEl.querySelectorAll(".record").forEach(card => {
+    card.addEventListener("click", () => {
+      const marker = markerById.get(card.dataset.id);
+      if (!marker) return;
+      map.setView(marker.getLatLng(), 9, { animate: true });
+      marker.openPopup();
+    });
+  });
+}
+
+function fitToVisible(animate = true) {
+  const bounds = [];
+  markersLayer.eachLayer(l => { if (l.getLatLng) bounds.push(l.getLatLng()); });
+  if (!bounds.length) return;
+  map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 9, animate });
+}
+
+function refresh() { renderMap(); renderList(); }
+
+// ---------------------------------------------------------------------------
+// Event listeners
+// ---------------------------------------------------------------------------
+stateFilter.addEventListener("change", () => {
+  updateCountyFilter(allRecords);
+  countyFilter.value = "all";
+  refresh();
+});
+countyFilter.addEventListener("change", refresh);
+seasonFilter.addEventListener("change", refresh);
+unitSelect.addEventListener("change", refresh);
+fitBtn.addEventListener("click", () => fitToVisible(true));
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+loadRecords().then(rows => {
+  allRecords = rows;
+  populateFilters(rows);
+  updateCountyFilter(rows);
+  renderMap();
+  renderList();
+});
+</script>
+</body>
+</html>
