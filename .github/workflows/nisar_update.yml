@@ -36,15 +36,9 @@ jobs:
           EARTHDATA_PASS: ${{ secrets.EARTHDATA_PASS }}
 
       - name: Commit updated CSV
-        run: |
-          git config user.name  "venkataseetharam"
-          git config user.email "pendekantiseetharam@gmail.com"
-          git fetch origin main
-          git add data/nisar_subsidence.csv
-          if git diff --cached --quiet; then
-            echo "No changes — skipping commit"
-          else
-            git commit -m "chore: update NISAR subsidence data $(date -u +%Y-%m-%d)"
-            git rebase origin/main
-            git push origin HEAD:main
-          fi
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update NISAR subsidence data"
+          file_pattern: data/nisar_subsidence.csv
+          commit_user_name: venkataseetharam
+          commit_user_email: pendekantiseetharam@gmail.com
