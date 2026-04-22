@@ -39,8 +39,12 @@ jobs:
         run: |
           git config user.name  "venkataseetharam"
           git config user.email "pendekantiseetharam@gmail.com"
+          git fetch origin main
           git add data/nisar_subsidence.csv
-          git diff --cached --quiet && echo "No changes — skipping commit" || \
+          if git diff --cached --quiet; then
+            echo "No changes — skipping commit"
+          else
             git commit -m "chore: update NISAR subsidence data $(date -u +%Y-%m-%d)"
-          git pull --rebase origin main
-          git push
+            git rebase origin/main
+            git push origin HEAD:main
+          fi
