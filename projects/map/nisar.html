@@ -273,8 +273,10 @@
 // Config
 // ─────────────────────────────────────────────────────────────
 const HDF5_URL = "NISAR_L2.h5";  // local HDF5 file (served alongside HTML)
+// CSV is published to the `nisar-data` branch by the weekly GitHub Actions workflow.
+// Using the fork's nisar-data branch; once upstreamed, change to ModelEarth/team.
 const CSV_URL  =
-  "https://raw.githubusercontent.com/ModelEarth/team/main/data/nisar_subsidence.csv";
+  "https://raw.githubusercontent.com/venkataseetharam/team/nisar-data/data/nisar_subsidence.csv";
 
 // Fallback city data (used if both HDF5 and CSV fail)
 const FALLBACK = [

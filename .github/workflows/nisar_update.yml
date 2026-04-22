@@ -16,12 +16,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout main
+      - name: Checkout main (for pipeline scripts)
         uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
@@ -34,18 +32,40 @@ jobs:
         run: pip install -r scripts/requirements.txt
 
       - name: Run NISAR data pipeline
-        run: python scripts/fetch_nisar.py --output data/nisar_subsidence.csv
+        run: |
+          mkdir -p data
+          python scripts/fetch_nisar.py --output data/nisar_subsidence.csv
         env:
           EARTHDATA_USER: ${{ secrets.EARTHDATA_USER }}
           EARTHDATA_PASS: ${{ secrets.EARTHDATA_PASS }}
 
-      - name: Commit and push CSV
-        uses: EndBug/add-and-commit@v9
-        with:
-          default_author: user_info
-          author_name: venkataseetharam
-          author_email: pendekantiseetharam@gmail.com
-          message: "chore: update NISAR subsidence data"
-          add: "data/nisar_subsidence.csv"
-          push: true
-          pull: "--rebase --autostash"
+      - name: Publish CSV to nisar-data branch
+        run: |
+          set -euo pipefail
+
+          # Stash the generated CSV outside the git tree
+          cp data/nisar_subsidence.csv /tmp/nisar_subsidence.csv
+
+          git config user.name  "venkataseetharam"
+          git config user.email "pendekantiseetharam@gmail.com"
+
+          # Create or switch to the orphan nisar-data branch
+          if git ls-remote --exit-code --heads origin nisar-data; then
+            git fetch origin nisar-data
+            git checkout nisar-data
+          else
+            git checkout --orphan nisar-data
+            git rm -rf . 2>/dev/null || true
+          fi
+
+          # Replace CSV and push
+          mkdir -p data
+          cp /tmp/nisar_subsidence.csv data/nisar_subsidence.csv
+          git add data/nisar_subsidence.csv
+
+          if git diff --cached --quiet; then
+            echo "No changes — nothing to commit"
+          else
+            git commit -m "chore: update NISAR subsidence data $(date -u +%Y-%m-%d)"
+            git push origin nisar-data
+          fi
