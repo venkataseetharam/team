@@ -42,4 +42,5 @@ jobs:
           git add data/nisar_subsidence.csv
           git diff --cached --quiet && echo "No changes — skipping commit" || \
             git commit -m "chore: update NISAR subsidence data $(date -u +%Y-%m-%d)"
+          git pull --rebase origin main
           git push
