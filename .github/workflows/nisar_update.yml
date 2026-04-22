@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write           # Needed to commit the updated CSV
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   update-nisar:
     runs-on: ubuntu-latest
